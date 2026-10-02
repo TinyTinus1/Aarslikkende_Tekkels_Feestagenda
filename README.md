@@ -6,7 +6,7 @@ Een eenvoudige Nederlandstalige agenda voor één besloten groep. Geen buildstap
 
 De naam is Agenda Aarslikkende tekkels. Nieuwe gebruikers bevestigen eerst hun e-mailadres met een inloglink en vragen daarna toegang aan. Totdat een beheerder goedkeurt, kunnen ze geen activiteiten lezen of schrijven. Tinus beoordeelt aanvragen op de website met het bestaande beheerdersaccount; de mailbox zelf verleent geen beheerrechten. Bestaande leden behouden hun toegang.
 
-De aanvraagmelding gaat uitsluitend naar aarslikkendetekkels@gmail.com. De Edge Function notify-membership is gedeployd; verzending vereist nog de hieronder beschreven Gmail-secrets. Goedkeuren gebeurt ingelogd op de website, niet door een e-maillink alleen te openen. Aanvragen blijven ook zichtbaar wanneer mailverzending mislukt.
+De aanvraagmelding gaat uitsluitend naar aarslikkendetekkels@gmail.com. De Edge Function notify-membership is gedeployd, de Gmail-secrets zijn ingesteld en de testmail is op 2 oktober 2026 succesvol via het ingelogde beheerdersaccount verstuurd. Goedkeuren gebeurt ingelogd op de website, niet door een e-maillink alleen te openen. Aanvragen blijven ook zichtbaar wanneer mailverzending mislukt.
 
 Bovenaan staat voor beheerders .ICS importeren. Kies maximaal 200 activiteiten in een bestand van maximaal 1 MB, controleer het voorbeeld en bevestig de import. De import is atomair; opnieuw importeren met hetzelfde beheerdersaccount slaat bestaande UID’s over. Losse afspraken en meegestuurde tijdzones worden ondersteund. Terugkerende afspraken, geannuleerde items, ontbrekende tijdzonedefinities en ongeldige velden worden met reden overgeslagen. Zonder eindtijd krijgt een afspraak één uur; een hele dag loopt tot de volgende lokale middernacht. Het geïmporteerde item heeft de beheerder als maker.
 
@@ -20,9 +20,9 @@ De themakeuze wordt alleen op je eigen apparaat onthouden. Via **Voeg toe aan pe
 
 Het Supabase-project **OnlineGroepsagenda** is gekoppeld via `config.js`. De database en toegangsregels zijn al aangemaakt, en het eerste lid is toegevoegd. **Voer schema.sql voor dit project niet opnieuw uit.** Het bestand is bedoeld als referentie en voor een nieuw, leeg project.
 
-De database is getest met tijdelijke testaccounts en transacties: groepsleden kunnen activiteiten lezen, alleen hun eigen activiteiten wijzigen, geen andere leden toevoegen en geen auteur of eigenaar vervalsen. Niet-leden en bezoekers zonder login hebben geen toegang. Alle testgegevens zijn teruggedraaid. De Supabase-securityadviseur gaf geen meldingen.
+De database is getest met tijdelijke testaccounts en transacties: groepsleden kunnen activiteiten lezen, alleen hun eigen activiteiten wijzigen, geen andere leden toevoegen en geen auteur of eigenaar vervalsen. Niet-leden en bezoekers zonder login hebben geen toegang. Alle testgegevens zijn teruggedraaid. De laatste Supabase-securitycontrole gaf geen databasewaarschuwingen. De bestaande Auth-waarschuwing over bescherming tegen gelekte wachtwoorden staat nog aan; deze agenda gebruikt inloglinks.
 
-**Publicatie:** GitHub Pages is actief. De SMTP-instellingen zijn ingevuld, maar bij de laatste inlogpoging gaf Gmail een tijdelijke verzendfout. Een succesvolle echte e-mail-login en opslag via de gepubliceerde website moeten nog worden gecontroleerd.
+**Publicatie:** GitHub Pages is actief. Tinus is succesvol ingelogd via e-mail en de opgeslagen activiteit is zichtbaar op de gepubliceerde website. De beheerdermail is succesvol verstuurd. Goedkeuring, afgeschermde toegang en atomaire import zijn met database-transacties getest; importvoorbeelden en het overslaan van dubbelen zijn in de browser gecontroleerd.
 
 ## 1. Maak een Supabase-project
 
@@ -113,7 +113,7 @@ Je kunt `index.html` lokaal openen en op **Bekijk de voorbeeldagenda** klikken. 
 
 ## Leden beheren
 
-Je beheert leden via Supabase; een aparte beheerderspagina is niet nodig voor deze eerste versie. Voeg een lid toe met de query uit stap 1. Verwijder toegang met:
+Nieuwe leden vragen toegang aan op de website. Als beheerder beoordeel je ze bij Aanmeldingsaanvragen. Je kunt leden ook vooraf toevoegen via Supabase met de query uit stap 1. Verwijder toegang met:
 
 ```sql
 delete from public.members where email = 'vriend@voorbeeld.nl';
