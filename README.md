@@ -4,11 +4,17 @@ Een eenvoudige Nederlandstalige agenda voor één besloten groep. Geen buildstap
 
 ## Status van deze levering
 
+De versie met beheerrechten, aanwezigheidsregistratie, een donker thema en `.ics`-export is toegevoegd. Tinus heeft beheerrechten in Supabase. Leden kunnen alleen hun eigen activiteiten bewerken en verwijderen; de beheerder kan dat bij alle activiteiten. Elke nieuwe activiteit is zichtbaar voor de hele groep. Je aanwezigheid kun je zelf aan- en uitzetten; anderen zien de namen van aanwezige leden.
+
+De themakeuze wordt alleen op je eigen apparaat onthouden. Via **Voeg toe aan persoonlijke agenda** download je één activiteit; de knop onder de kalender exporteert alle activiteiten, ook buiten de geselecteerde maand. Dit is een eenmalige import, geen abonnement: wijzigingen en verwijderingen worden niet automatisch in je persoonlijke agenda doorgevoerd. De daadwerkelijke import op een fysieke iPhone moet nog worden gecontroleerd; de .ics-export is getest op UTC-tijden, escaping en UTF-8-regelvouwen.
+
+`supabase/admin-attendance.sql` is al uitgevoerd op dit project; voer het niet opnieuw uit. Voor een geheel nieuw project voer je eerst schema.sql uit en daarna admin-attendance.sql. Beheerrechten staan in `public.members.is_admin` en kunnen uitsluitend via Supabase worden toegekend, niet vanuit de website.
+
 Het Supabase-project **OnlineGroepsagenda** is gekoppeld via `config.js`. De database en toegangsregels zijn al aangemaakt, en het eerste lid is toegevoegd. **Voer schema.sql voor dit project niet opnieuw uit.** Het bestand is bedoeld als referentie en voor een nieuw, leeg project.
 
 De database is getest met tijdelijke testaccounts en transacties: groepsleden kunnen activiteiten lezen, alleen hun eigen activiteiten wijzigen, geen andere leden toevoegen en geen auteur of eigenaar vervalsen. Niet-leden en bezoekers zonder login hebben geen toegang. Alle testgegevens zijn teruggedraaid. De Supabase-securityadviseur gaf geen meldingen.
 
-**Nog te doen:** de bestanden naar GitHub uploaden (stap 3), GitHub Pages activeren en in Supabase het website-adres en de mailprovider instellen (stap 4). Een echte e-mail-login en opslag via de gepubliceerde website moeten daarna nog worden getest (stap 5).
+**Publicatie:** GitHub Pages is actief. De SMTP-instellingen zijn ingevuld, maar bij de laatste inlogpoging gaf Gmail een tijdelijke verzendfout. Een succesvolle echte e-mail-login en opslag via de gepubliceerde website moeten nog worden gecontroleerd.
 
 ## 1. Maak een Supabase-project
 
@@ -51,10 +57,11 @@ Plaats de bestanden **uit deze map** in de hoofdmap van de repository:
 - `index.html`
 - `style.css`
 - `app.js`
+- `calendar-export.js`
 - `config.js`
 - `.nojekyll`
 - `README.md`
-- `supabase/schema.sql` (in de submap `supabase`)
+- `supabase/schema.sql` en `supabase/admin-attendance.sql` (in de submap `supabase`; bij een browserupload mag de migratie ook als admin-attendance.sql in de hoofdmap staan)
 
 Dus niet een extra map `groepsagenda` om de hele website heen. Als er al bestanden in de repository staan, controleer eerst of je die wilt vervangen.
 
@@ -62,7 +69,7 @@ Commit de bestanden. Open de repository-instellingen → **Pages** → **Build a
 
 https://TinyTinus1.github.io/Aarslikkende_Tekkels_Feestagenda/
 
-Dit is het verwachte adres, geen bevestiging dat de website al is gepubliceerd. Een eigen domein of andere Pages-instelling kan het adres veranderen. Gebruik uiteindelijk het adres dat GitHub Pages zelf toont. Voor een private repository hangt Pages-beschikbaarheid af van je GitHub-plan.
+GitHub Pages heeft dit adres als live website bevestigd. Een eigen domein of andere Pages-instelling kan het adres veranderen. Gebruik uiteindelijk het adres dat GitHub Pages zelf toont. Voor een private repository hangt Pages-beschikbaarheid af van je GitHub-plan.
 
 ## 4. Stel de e-mail-login in
 
@@ -87,7 +94,7 @@ Controleer bij **Authentication → Email Templates → Magic Link** dat de inlo
 5. Log in met een e-mailadres dat niet in `members` staat: de agenda moet afgeschermd blijven.
 6. Trek de toegang van een lid in via Supabase; vernieuw de agenda op diens apparaat en controleer dat er geen toegang meer is.
 
-De inlog-, opslag- en toegangsregels kunnen pas volledig worden getest met een geconfigureerd Supabase-project. Deze bestanden bevatten geen echte accounts of projectgegevens.
+De inlog-, opslag- en toegangsregels kunnen pas volledig worden getest met een geconfigureerd Supabase-project. config.js bevat de openbare projectinstellingen; leden en inloggegevens worden uitsluitend in Supabase beheerd.
 
 ## Voorbeeld bekijken
 
@@ -103,7 +110,7 @@ Je beheert leden via Supabase; een aparte beheerderspagina is niet nodig voor de
 delete from public.members where email = 'vriend@voorbeeld.nl';
 ```
 
-Activiteiten blijven dan bewaard. Alleen de maker kan ze via de website aanpassen; als beheerder kun je ze in de Supabase Table Editor beheren. Als je het hele Supabase-account van een gebruiker verwijdert, worden diens activiteiten door de database ook verwijderd.
+Activiteiten blijven dan bewaard. De maker en een groepsbeheerder kunnen ze via de website aanpassen. Als je het hele Supabase-account van een gebruiker verwijdert, worden diens activiteiten door de database ook verwijderd.
 
 Een ingetrokken lid kan geen nieuwe gegevens ophalen of schrijven. Gegevens die eerder op diens scherm stonden kunnen blijven staan tot het vernieuwen; reeds bekeken gegevens kunnen uiteraard niet worden teruggenomen.
 

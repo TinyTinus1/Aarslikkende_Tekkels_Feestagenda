@@ -4,6 +4,15 @@ const config = window.AGENDA_CONFIG || {};
 let client, user, member, events = [], editingId = null, selectedDay = null, requestId = 0;
 let month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 const weekdays = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
+function setTheme(dark) {
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('theme-toggle').textContent = dark ? 'Licht thema' : 'Donker thema';
+  $('theme-toggle').setAttribute('aria-pressed',String(dark));
+  try {localStorage.setItem('agenda-theme',dark ? 'dark' : 'light');} catch {}
+}
+let savedTheme;try {savedTheme = localStorage.getItem('agenda-theme');} catch {}
+setTheme(savedTheme ? savedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
+$('theme-toggle').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme !== 'dark'));
 const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const localInput = (d) => `${dateKey(d)}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 const format = (date, options) => new Intl.DateTimeFormat('nl-NL', options).format(new Date(date));
@@ -50,8 +59,19 @@ function render() {
     if(event.location) content.append(element('div','event-meta',event.location));
     if(event.description) content.append(element('p','event-description',event.description));
     const bottom = element('div','event-bottom'); bottom.append(element('span','event-author',`Door ${event.author_name}`));
-    if(user && event.owner_id === user.id) { const edit = element('button','quiet edit','Bewerken'); edit.addEventListener('click',()=>openEditor(event)); bottom.append(edit); }
-    content.append(bottom);card.append(badge,content);list.append(card);
+    if(user && (event.owner_id === user.id || member?.is_admin)) { const edit = element('button','quiet edit','Bewerken'); edit.addEventListener('click',()=>openEditor(event)); bottom.append(edit); }
+    content.append(bottom);
+    const attendees = event.attendance || [], attending = attendees.some(a=>a.user_id === user?.id);
+    const attendance = element('div','attendance');
+    attendance.append(element('div','attendance-names',attendees.length ? `Aanwezig (${attendees.length}): ${attendees.map(a=>a.display_name).join(', ')}` : 'Nog niemand aangemeld'));
+    const actions = element('div','event-actions');
+    const attend = element('button','attendance-button',attending ? 'Aanwezig · Afmelden' : 'Ik ben aanwezig');
+    attend.setAttribute('aria-pressed',String(attending));
+    attend.addEventListener('click',()=>toggleAttendance(event,attend));
+    const exportButton = element('button','quiet calendar-export','Voeg toe aan persoonlijke agenda');
+    exportButton.addEventListener('click',()=>window.AgendaExport.download([event],`activiteit-${event.id}.ics`));
+    actions.append(attend,exportButton);attendance.append(actions);content.append(attendance);
+    card.append(badge,content);list.append(card);
   });
 }
 async function loadEvents() {
@@ -60,7 +80,7 @@ async function loadEvents() {
   if(!client || !member) return;
   const start = new Date(month); start.setDate(start.getDate()-(start.getDay()+6)%7);
   const end = new Date(start); end.setDate(end.getDate()+42);
-  const {data,error} = await client.from('events').select('*').lt('starts_at',end.toISOString()).gt('ends_at',start.toISOString()).order('starts_at');
+  const {data,error} = await client.from('events').select('*,attendance(user_id,display_name)').lt('starts_at',end.toISOString()).gt('ends_at',start.toISOString()).order('starts_at');
   if(id !== requestId) return;
   if(error) { notice('De agenda kon niet worden geladen. Probeer Agenda vernieuwen.',true); return; }
   events = data || []; render();
@@ -70,11 +90,11 @@ async function applySession(session) {
   $('event-dialog').close(); $('agenda-view').hidden = true; $('login-view').hidden = false;
   $('logout').hidden = !user; $('account-name').textContent = '';
   if(!user) { render(); return; }
-  const {data,error} = await client.from('members').select('display_name').maybeSingle();
+  const {data,error} = await client.from('members').select('display_name,is_admin').maybeSingle();
   if(id !== requestId) return;
   if(error) { notice('Je groepslidmaatschap kon niet worden gecontroleerd. Probeer opnieuw in te loggen.',true); return; }
   if(!data) { notice('Je bent ingelogd, maar nog geen lid van deze groep. Vraag de beheerder om jouw e-mailadres toe te voegen.',true); return; }
-  member = data; $('account-name').textContent = member.display_name;
+  member = data; $('account-name').textContent = member.display_name + (member.is_admin ? ' · Beheerder' : '');
   $('login-view').hidden = true; $('agenda-view').hidden = false; notice(''); await loadEvents();
 }
 function openEditor(event) {
@@ -88,6 +108,38 @@ function openEditor(event) {
   $('event-dialog').showModal(); $('title').focus();
 }
 function editorBusy(busy) { $('save-event').disabled = busy; $('delete-event').disabled = busy; $('close-dialog').disabled = busy; }
+async function toggleAttendance(event,button) {
+  if(!user || !member) return;
+  button.disabled=true;
+  try {
+    const attending = (event.attendance || []).some(a=>a.user_id === user.id);
+    if(demo) {
+      event.attendance = attending ? event.attendance.filter(a=>a.user_id !== user.id) : [...(event.attendance || []),{user_id:user.id,display_name:member.display_name}];
+    } else {
+      const query = attending ? client.from('attendance').delete().eq('event_id',event.id).eq('user_id',user.id) : client.from('attendance').insert({event_id:event.id});
+      const {error} = await query; if(error)throw error;
+    }
+    await loadEvents();
+  } catch {notice('Je aanwezigheid kon niet worden opgeslagen. Probeer opnieuw.',true);}
+  finally {button.disabled=false;}
+}
+$('export-all').addEventListener('click',async()=>{
+  const button=$('export-all');button.disabled=true;
+  try {
+    let all=events;
+    if(!demo) {
+      all=[];
+      for(let from=0;;from+=1000) {
+        const {data,error}=await client.from('events').select('*').order('starts_at').order('id').range(from,from+999);
+        if(error)throw error;all.push(...data);if(data.length<1000)break;
+      }
+    }
+    if(!all.length) {notice('Er zijn nog geen activiteiten om toe te voegen.');return;}
+    window.AgendaExport.download(all);
+    notice('Het .ics-bestand is gedownload. Open het in je agenda-app om de activiteiten te importeren.');
+  } catch {notice('Het agendabestand kon niet worden gemaakt. Probeer opnieuw.',true);}
+  finally {button.disabled=false;}
+});
 $('event-form').addEventListener('submit',async (e)=>{
   e.preventDefault(); if($('save-event').disabled) return;
   const start = new Date($('starts').value), end = new Date($('ends').value);
@@ -146,14 +198,15 @@ $('login-form').addEventListener('submit',async(e)=>{
 async function init() {
   render();
   if(demo) {
-    user={id:'demo-member'};member={display_name:'Jij'};
+    user={id:'demo-member'};member={display_name:'Tinus',is_admin:true};
     const sample = (day,hour,duration)=> {const d = new Date(month.getFullYear(),month.getMonth(),day,hour);return {starts_at:d.toISOString(),ends_at:new Date(d.getTime()+duration*3600000).toISOString()};};
     events = [
       {id:'sample-1',...sample(9,20,4),title:'Verjaardagsfeest',location:'Bij Noor thuis',description:'Een gezellige avond met de hele groep.',owner_id:'noor',author_name:'Noor'},
       {id:'sample-2',...sample(17,15,3),title:'Samen naar het park',location:'Bij de ingang van het park',description:'Neem iets lekkers mee voor de picknick.',owner_id:user.id,author_name:'Jij'},
       {id:'sample-3',...sample(24,19,4),title:'Spelletjesavond',location:'Bij Sam',description:'Neem je favoriete spel mee.',owner_id:'sam',author_name:'Sam'}
     ];
-    $('login-view').hidden=true;$('agenda-view').hidden=false;$('account-name').textContent='Voorbeeldagenda';$('logout').hidden=false;
+    events[0].attendance=[{user_id:'noor',display_name:'Noor'},{user_id:'sam',display_name:'Sam'}];
+    $('login-view').hidden=true;$('agenda-view').hidden=false;$('account-name').textContent='Voorbeeldagenda · Beheerder';$('logout').hidden=false;
     $('footer-note').textContent='Dit is een voorbeeld met fictieve activiteiten. Er wordt niets online opgeslagen.';
     notice('Voorbeeldagenda: je wijzigingen zijn tijdelijk en verdwijnen bij het herladen.');render();return;
   }
