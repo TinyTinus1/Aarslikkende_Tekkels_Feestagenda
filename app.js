@@ -97,6 +97,14 @@ async function applySession(session) {
   member = data; $('account-name').textContent = member.display_name + (member.is_admin ? ' · Beheerder' : '');
   $('login-view').hidden = true; $('agenda-view').hidden = false; notice(''); await loadEvents();
 }
+function updateMapsSearch() {
+  const query = $('location').value.trim(), link = $('maps-search');
+  link.setAttribute('aria-disabled', String(!query));
+  if(query) {link.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);link.removeAttribute('tabindex');}
+  else {link.removeAttribute('href');link.setAttribute('tabindex','-1');}
+}
+$('location').addEventListener('input',updateMapsSearch);
+updateMapsSearch();
 function openEditor(event) {
   editingId = event?.id || null; $('event-form').reset(); $('form-error').textContent = '';
   $('dialog-title').textContent = event ? 'Activiteit bewerken' : 'Nieuwe activiteit'; $('delete-event').hidden = !event;
@@ -104,7 +112,7 @@ function openEditor(event) {
   if(event) start = new Date(event.starts_at);
   const end = event ? new Date(event.ends_at) : new Date(start.getTime()+2*60*60*1000);
   $('title').value = event?.title || ''; $('starts').value = localInput(start); $('ends').value = localInput(end);
-  $('location').value = event?.location || ''; $('description').value = event?.description || '';
+  $('location').value = event?.location || ''; updateMapsSearch(); $('description').value = event?.description || '';
   $('event-dialog').showModal(); $('title').focus();
 }
 function editorBusy(busy) { $('save-event').disabled = busy; $('delete-event').disabled = busy; $('close-dialog').disabled = busy; }

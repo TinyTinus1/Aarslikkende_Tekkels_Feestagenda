@@ -4,6 +4,8 @@ Een eenvoudige Nederlandstalige agenda voor één besloten groep. Geen buildstap
 
 ## Status van deze levering
 
+De vormgeving heeft oranje knoppen en accenten. Het donkere thema gebruikt een zwarte achtergrond met een iets lichtere kalender. De groepsnaam en maandtekst zijn aangepast; Activiteit toevoegen staat direct onder Op de planning. Onder Waar? staat een gratis Google Maps-zoeklink: typ een adres of locatienaam, open Google Maps en neem het gevonden adres handmatig over. Er is geen API-sleutel nodig en er worden geen adresvoorstellen in het formulier opgehaald.
+
 De versie met beheerrechten, aanwezigheidsregistratie, een donker thema en `.ics`-export is toegevoegd. Tinus heeft beheerrechten in Supabase. Leden kunnen alleen hun eigen activiteiten bewerken en verwijderen; de beheerder kan dat bij alle activiteiten. Elke nieuwe activiteit is zichtbaar voor de hele groep. Je aanwezigheid kun je zelf aan- en uitzetten; anderen zien de namen van aanwezige leden.
 
 De themakeuze wordt alleen op je eigen apparaat onthouden. Via **Voeg toe aan persoonlijke agenda** download je één activiteit; de knop onder de kalender exporteert alle activiteiten, ook buiten de geselecteerde maand. Dit is een eenmalige import, geen abonnement: wijzigingen en verwijderingen worden niet automatisch in je persoonlijke agenda doorgevoerd. De daadwerkelijke import op een fysieke iPhone moet nog worden gecontroleerd; de .ics-export is getest op UTC-tijden, escaping en UTF-8-regelvouwen.
@@ -124,3 +126,5 @@ Nieuwe commits in de gekozen Pages-branch publiceren wijzigingen. Er zijn geen s
 - Supabase toegangsregels: https://supabase.com/docs/guides/database/postgres/row-level-security
 - Redirect URLs: https://supabase.com/docs/guides/auth/redirect-urls
 - SMTP instellen: https://supabase.com/docs/guides/auth/auth-smtp
+
+Google Maps URLs: https://developers.google.com/maps/documentation/urls/get-started

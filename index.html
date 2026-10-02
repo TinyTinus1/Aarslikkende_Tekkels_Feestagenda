@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Een gezamenlijke agenda voor feesten en activiteiten van je groep.">
-  <title>Samen · Groepsagenda</title>
-  <link rel="stylesheet" href="./style.css?v=2">
+  <title>Feest/Activiteiten Agenda Aarslikkende Tekkels</title>
+  <link rel="stylesheet" href="./style.css?v=3">
   <script src="./config.js"></script>
-  <script src="./calendar-export.js?v=2"></script>
-  <script defer src="./app.js?v=2"></script>
+  <script src="./calendar-export.js?v=3"></script>
+  <script defer src="./app.js?v=3"></script>
 </head>
 <body>
-  <header class="header"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">S</span>Samen<span class="brand-sub">groepsagenda</span></a><div class="account"><button id="theme-toggle" class="quiet" aria-pressed="false">Donker thema</button><span id="account-name"></span><button id="logout" class="quiet" hidden>Uitloggen</button></div></header>
+  <header class="header"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">AT</span><span class="brand-title">Feest/Actviteiten Agenda Aarslikkende Tekkels</span><span class="brand-sub">Groepsagenda</span></a><div class="account"><button id="theme-toggle" class="quiet" aria-pressed="false">Donker thema</button><span id="account-name"></span><button id="logout" class="quiet" hidden>Uitloggen</button></div></header>
   <main>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
     <section id="login-view" class="login-panel">
@@ -21,13 +21,13 @@
       <div id="setup" class="setup" hidden><strong>De agenda is nog niet verbonden.</strong><p>Vul eerst het Supabase-project in via config.js. De handleiding beschrijft alle stappen.</p><a href="?demo=1" class="demo-link">Bekijk de voorbeeldagenda</a></div>
     </section>
     <section id="agenda-view" hidden>
-      <div class="page-heading"><div><span class="eyebrow">SAMEN IETS LEUKS PLANNEN</span><h1>Onze agenda<span class="accent">.</span></h1><p>Feesten, uitjes en alles daartussen.</p></div><button id="add-event" class="primary"><span aria-hidden="true">＋</span> Activiteit toevoegen</button></div>
+      <div class="page-heading"><div><span class="eyebrow">De Feest/Activiteits programma van de groep voor deze maand</span><h1>Onze agenda<span class="accent">.</span></h1><p>Feesten, uitjes en alles daartussen.</p></div></div>
       <div class="workspace">
         <section class="calendar-panel" aria-label="Maandkalender"><div class="calendar-toolbar"><h2 id="month-title"></h2><div class="calendar-nav"><button id="today" class="quiet">Vandaag</button><button id="prev-month" class="icon-button" aria-label="Vorige maand">‹</button><button id="next-month" class="icon-button" aria-label="Volgende maand">›</button></div></div><div class="weekdays" aria-hidden="true"><span>Ma</span><span>Di</span><span>Wo</span><span>Do</span><span>Vr</span><span>Za</span><span>Zo</span></div><div id="calendar" class="calendar"></div><div class="calendar-footer"><span><i class="legend-dot"></i> Een dag met plannen</span><button id="all-days" class="quiet">Hele maand bekijken</button></div></section>
-        <section class="events-panel" aria-label="Activiteiten"><div class="events-heading"><div><span class="eyebrow" id="list-kicker">DEZE MAAND</span><h2 id="list-title">Op de planning</h2></div><span id="event-count" class="count">0</span></div><div id="events" aria-live="polite"></div><button id="refresh" class="quiet refresh">Agenda vernieuwen</button></section>
+        <section class="events-panel" aria-label="Activiteiten"><div class="events-heading"><div><span class="eyebrow" id="list-kicker">DEZE MAAND</span><h2 id="list-title">Op de planning</h2></div><span id="event-count" class="count">0</span></div><button id="add-event" class="primary"><span aria-hidden="true">＋</span> Activiteit toevoegen</button><div id="events" aria-live="polite"></div><button id="refresh" class="quiet refresh">Agenda vernieuwen</button></section>
       </div><button id="export-all" class="quiet export-all">Voeg alle activiteiten toe aan persoonlijke agenda</button><p class="footer-note" id="footer-note">Plannen worden elke 30 seconden bijgewerkt.</p>
     </section>
   </main>
-  <dialog id="event-dialog"><form id="event-form"><div class="dialog-heading"><h2 id="dialog-title">Nieuwe activiteit</h2><button type="button" id="close-dialog" class="icon-button" aria-label="Sluiten">×</button></div><label for="title">Wat gaan we doen?</label><input id="title" name="title" maxlength="100" required placeholder="Bijvoorbeeld: verjaardagsfeest"><div class="form-row"><div><label for="starts">Begint op</label><input id="starts" name="starts" type="datetime-local" required></div><div><label for="ends">Eindigt op</label><input id="ends" name="ends" type="datetime-local" required></div></div><label for="location">Waar?</label><input id="location" name="location" maxlength="200" placeholder="Locatie of adres"><label for="description">Extra informatie</label><textarea id="description" name="description" rows="3" maxlength="2000" placeholder="Wat moeten de anderen weten?"></textarea><p id="form-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" id="delete-event" class="danger" hidden>Verwijderen</button><button type="submit" id="save-event" class="primary">Activiteit opslaan</button></div></form></dialog>
+  <dialog id="event-dialog"><form id="event-form"><div class="dialog-heading"><h2 id="dialog-title">Nieuwe activiteit</h2><button type="button" id="close-dialog" class="icon-button" aria-label="Sluiten">×</button></div><label for="title">Wat gaan we doen?</label><input id="title" name="title" maxlength="100" required placeholder="Bijvoorbeeld: verjaardagsfeest"><div class="form-row"><div><label for="starts">Begint op</label><input id="starts" name="starts" type="datetime-local" required></div><div><label for="ends">Eindigt op</label><input id="ends" name="ends" type="datetime-local" required></div></div><label for="location">Waar?</label><input id="location" name="location" maxlength="200" placeholder="Locatie of adres" aria-describedby="maps-help"><div class="location-tools"><a id="maps-search" class="maps-search" target="_blank" rel="noopener noreferrer" aria-disabled="true">Zoek adres in Google Maps ↗</a><p id="maps-help">Vul een adres of locatienaam in. Google Maps opent in een nieuw tabblad; neem het gevonden adres hier over.</p></div><label for="description">Extra informatie</label><textarea id="description" name="description" rows="3" maxlength="2000" placeholder="Wat moeten de anderen weten?"></textarea><p id="form-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" id="delete-event" class="danger" hidden>Verwijderen</button><button type="submit" id="save-event" class="primary">Activiteit opslaan</button></div></form></dialog>
 </body>
 </html>
