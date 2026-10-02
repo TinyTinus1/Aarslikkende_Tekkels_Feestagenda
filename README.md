@@ -170,3 +170,9 @@ Verificatie op 2 oktober 2026: tests voor verplichte geboortedatum, goedkeuring 
 ## Bevestigingsmail na goedkeuring
 
 Vanaf 2 oktober 2026 zet goedkeuren van een nieuwe toegangsaanvraag automatisch één welkomstmail klaar voor het bevestigde e-mailadres van die gebruiker. De mail bevat de tekst Je bent toegelaten tot de groep en een oranje Open de agenda-knop. Die link verleent geen toegang zonder de bestaande inlogflow. Afwijzen verstuurt geen welkomstmail. De bestaande serverwachtrij, retry-logica, JWT-beveiligde worker en Cron-taak worden gebruikt. Als toegang vóór verzending is ingetrokken, wordt de mail overgeslagen. Er is geen backfill naar eerder goedgekeurde leden. De migratie approval-notifications.sql is al toegepast; notify-activities is bijgewerkt naar versie 2. Database-tests zijn teruggedraaid; mailinhoud, HTML-escaping, activiteitenmail en afleveringregistratie zijn met een gemockte SMTP-transport getest.
+
+
+### Eerste aanmelding met code
+Nieuwe, nog niet bevestigde Auth-accounts krijgen in de Supabase-mail **Confirm sign up** alleen `{{ .Token }}` en een gewone link naar de agenda, zonder bevestigingstoken in de link. Het sjabloon staat in `supabase/signup-email.html`. De mail **Magic link or OTP** blijft een inloglink bevatten voor al bevestigde accounts. Na verificatie via `verifyOtp({ email, token, type: "email" })` volgt het bestaande formulier voor naam/geboortedatum en de beheerdersgoedkeuring. Bestaande accounts hoeven hun adres niet opnieuw te bevestigen.
+
+Bij terugkeer uit Google Maps negeert de app herhaalde `SIGNED_IN`-meldingen voor dezelfde ingelogde gebruiker, zodat het open formulier en niet opgeslagen invoer behouden blijven. Een echte uitlog of accountwisseling sluit het formulier wel.

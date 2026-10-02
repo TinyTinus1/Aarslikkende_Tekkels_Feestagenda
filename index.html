@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="./style.css?v=5">
   <script src="./config.js"></script>
   <script src="./calendar-export.js?v=5"></script>
-  <script src="./calendar-import.js?v=5"></script><script src="./calendar-recurrence.js?v=5"></script><script defer src="./app.js?v=6"></script>
+  <script src="./calendar-import.js?v=5"></script><script src="./calendar-recurrence.js?v=5"></script><script defer src="./app.js?v=7"></script>
 </head>
 <body>
   <header class="header"><a class="brand" href="./"><span class="brand-icon" aria-hidden="true">AT</span><span class="brand-title">Agenda Aarslikkende tekkels</span><span class="brand-sub">Groepsagenda</span></a><div class="account"><button id="theme-toggle" class="quiet" aria-pressed="false">Donker thema</button><button id="import-ics" class="quiet" hidden>.ICS importeren</button><span id="account-name"></span><button id="logout" class="quiet" hidden>Uitloggen</button></div></header>
@@ -16,8 +16,9 @@
     <section id="login-view" class="login-panel">
       <span class="eyebrow">JULLIE PLANNEN, OP ÉÉN PLEK</span><h1>Wanneer zien we<br>elkaar weer?</h1>
       <p>Bekijk de agenda en zet je volgende feest of activiteit erbij.</p>
-      <form id="login-form"><label for="email">Je e-mailadres</label><input id="email" type="email" autocomplete="email" placeholder="jij@voorbeeld.nl" required maxlength="254"><button type="submit" class="primary">Stuur mij een inloglink</button></form>
-      <p class="small">Je ontvangt een inloglink per e-mail. Nieuwe gebruikers krijgen pas toegang nadat de beheerder hun aanvraag goedkeurt.</p>
+      <form id="login-form"><label for="email">Je e-mailadres</label><input id="email" type="email" autocomplete="email" placeholder="jij@voorbeeld.nl" required maxlength="254"><button type="submit" class="primary">Stuur mij een e-mail</button></form>
+      <p class="small">Nieuw? Je ontvangt eerst een bevestigingscode. Heb je je e-mailadres al bevestigd? Dan ontvang je een inloglink. De beheerder moet je aanvraag goedkeuren voordat je toegang krijgt.</p>
+      <button id="code-open" type="button" class="quiet">Ik heb al een bevestigingscode</button><div id="code-step" hidden><h2>Controleer je e-mail</h2><p>Nieuwe gebruikers ontvangen een code. Vul die hieronder in om je e-mailadres te bevestigen. Heb je een inloglink ontvangen? Open die om verder te gaan.</p><form id="code-form"><label for="code-email">Je e-mailadres</label><input id="code-email" type="email" autocomplete="email" required maxlength="254"><label for="email-code">Bevestigingscode uit je e-mail</label><input id="email-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required><button type="submit" class="primary">Bevestig mijn e-mailadres</button></form><button id="code-back" type="button" class="quiet">Nieuwe e-mail aanvragen / ander adres</button></div>
       <div id="setup" class="setup" hidden><strong>De agenda is nog niet verbonden.</strong><p>Vul eerst het Supabase-project in via config.js. De handleiding beschrijft alle stappen.</p><a href="?demo=1" class="demo-link">Bekijk de voorbeeldagenda</a></div>
     </section>
     <section id="request-view" class="login-panel" hidden><span class="eyebrow">TOEGANG TOT DE GROEP</span><h1>Vraag toegang aan</h1><p id="request-status"></p><form id="request-form"><label for="request-name">Hoe heet je?</label><input id="request-name" required maxlength="80" autocomplete="name"><label for="request-birth-date">Je geboortedatum</label><input id="request-birth-date" type="date" required min="1900-01-01" autocomplete="bday"><p class="small">Na goedkeuring verschijnt je verjaardag ieder jaar in de groepsagenda. Groepsleden zien de dag en maand, zonder geboortejaar.</p><button type="submit" class="primary">Verstuur aanmeldingsaanvraag</button></form><button id="request-refresh" class="quiet">Goedkeuring controleren</button><button id="request-mail" class="quiet" hidden>Stuur melding opnieuw</button></section><section id="agenda-view" hidden>

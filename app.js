@@ -3,6 +3,27 @@ const demo = new URLSearchParams(location.search).get('demo') === '1';
 const config = window.AGENDA_CONFIG || {};
 let client, user, member, events = [], editingId = null, selectedDay = null, requestId = 0;
 let demoSeries = [];
+const authReturn = new URLSearchParams(location.hash.slice(1));
+let authReturnError = authReturn.has('error') ? (authReturn.get('error_code')==='otp_expired' ? 'Deze inloglink is al gebruikt of verlopen. Vraag hieronder een nieuwe e-mail aan. Nieuw account? Gebruik de bevestigingscode uit de nieuwste mail.' : 'Inloggen is niet gelukt. Vraag hieronder een nieuwe e-mail aan.') : '';
+if(authReturnError)history.replaceState(null,'',location.pathname+location.search);
+function showCodeStep(email='') {
+ $('login-form').hidden=true;$('code-step').hidden=false;$('code-email').value=email;$('email-code').value='';
+}
+function resetCodeStep() {
+ $('login-form').hidden=false;$('code-step').hidden=true;$('email-code').value='';
+}
+$('code-open').addEventListener('click',()=>{showCodeStep($('email').value.trim());notice('');$('code-email').focus();});
+$('code-back').addEventListener('click',()=>{resetCodeStep();notice('');$('email').focus();});
+$('code-form').addEventListener('submit',async e=>{
+ e.preventDefault();if(!client)return;
+ const button=e.currentTarget.querySelector('button');button.disabled=true;
+ try {
+  const {data,error}=await client.auth.verifyOtp({email:$('code-email').value.trim(),token:$('email-code').value.trim(),type:'email'});
+  if(error||!data.session)throw error||new Error('session');
+  $('email-code').value='';authReturnError='';await applySession(data.session);
+ }catch{notice('De code klopt niet of is verlopen. Gebruik de code uit de nieuwste e-mail, of vraag een nieuwe e-mail aan.',true);}
+ finally{button.disabled=false;}
+});
 let month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 const weekdays = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
 function setTheme(dark) {
@@ -151,7 +172,7 @@ async function applySession(session) {
   const id = ++requestId; user = session?.user || null; member = null; events = [];
   $('event-dialog').close();$('import-dialog').close();$('import-ics').hidden=true;$('admin-requests').hidden=true;$('request-view').hidden=true; $('agenda-view').hidden = true; $('login-view').hidden = false;
   $('logout').hidden = !user; $('account-name').textContent = '';
-  if(!user) { render(); return; }
+  if(!user) { resetCodeStep();render();if(authReturnError)notice(authReturnError,true);return; }
   const {data,error} = await client.from('members').select('display_name,is_admin').maybeSingle();
   if(id !== requestId) return;
   if(error) { notice('Je groepslidmaatschap kon niet worden gecontroleerd. Probeer opnieuw in te loggen.',true); return; }
@@ -264,8 +285,8 @@ $('login-form').addEventListener('submit',async(e)=>{
     const redirect = new URL(location.href);redirect.hash='';redirect.search='';
     const {error} = await client.auth.signInWithOtp({email:$('email').value.trim(),options:{emailRedirectTo:redirect.href}});
     if(error)throw error;
-    notice('Controleer je e-mail voor de inloglink. Kijk ook in je spammap.');
-  } catch {notice('De inloglink kon niet worden verstuurd. Controleer het e-mailadres of probeer het later opnieuw.',true);}
+    authReturnError='';showCodeStep($('email').value.trim());notice('E-mail aangevraagd. Vul de bevestigingscode in als je nieuw bent, of open je inloglink. Kijk ook in je spammap.');
+  } catch(error) {notice(error?.status===429?'Wacht minstens een minuut voordat je opnieuw een e-mail aanvraagt.':'De e-mail kon niet worden verstuurd. Controleer het e-mailadres of probeer het later opnieuw.',true);}
   finally {button.disabled=false;}
 });
 
@@ -329,7 +350,11 @@ async function init() {
     const {createClient} = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/+esm');
     client = createClient(config.supabaseUrl,config.supabasePublishableKey);
     // Auth callbacks remain synchronous to avoid nested Supabase auth-lock calls.
-    client.auth.onAuthStateChange((event,session)=>{if(event !== 'TOKEN_REFRESHED')setTimeout(()=>applySession(session).catch(()=>notice('De verbinding is onderbroken. Herlaad de pagina.',true)),0);});
+    client.auth.onAuthStateChange((event,session)=>{
+      // SIGNED_IN can fire again when returning from another app. Preserve open forms for the same user.
+      if(event==='SIGNED_IN' && session?.user?.id===user?.id && (member || !$('request-view').hidden))return;
+      if(event !== 'TOKEN_REFRESHED')setTimeout(()=>applySession(session).catch(()=>notice('De verbinding is onderbroken. Herlaad de pagina.',true)),0);
+    });
     setInterval(()=>{if(user && member && !document.hidden && !$('event-dialog').open)loadEvents();},30000);
     window.addEventListener('focus',()=>{if(user && member && !$('event-dialog').open)loadEvents();});
   } catch {notice('De verbinding kon niet worden gestart. Controleer config.js en je internetverbinding.',true);}
