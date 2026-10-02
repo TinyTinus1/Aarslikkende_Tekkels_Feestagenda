@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
 const config = window.AGENDA_CONFIG || {};
 let client, user, member, events = [], editingId = null, selectedDay = null, requestId = 0;
+let demoSeries = [];
 let month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 const weekdays = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'];
 function setTheme(dark) {
@@ -54,8 +55,9 @@ function render() {
     badge.append(element('strong','',format(event.starts_at,{day:'numeric'})),element('span','',format(event.starts_at,{month:'short'})));
     const content = element('div','event-content');
     content.append(element('div','event-title',event.title));
+    if(event.recurrence && event.recurrence !== 'none') content.append(element('div','event-meta',({daily:'Herhaalt elke dag',weekly:'Herhaalt elke week',yearly:'Herhaalt elk jaar'})[event.recurrence]));
     const sameDate = dateKey(new Date(event.starts_at)) === dateKey(new Date(event.ends_at));
-    content.append(element('div','event-meta', `${format(event.starts_at,{hour:'2-digit',minute:'2-digit'})} – ${sameDate ? '' : format(event.ends_at,{day:'numeric',month:'short'})+' · '}${format(event.ends_at,{hour:'2-digit',minute:'2-digit'})}`));
+    content.append(element('div','event-meta', event.all_day ? 'Hele dag' : `${format(event.starts_at,{hour:'2-digit',minute:'2-digit'})} – ${sameDate ? '' : format(event.ends_at,{day:'numeric',month:'short'})+' · '}${format(event.ends_at,{hour:'2-digit',minute:'2-digit'})}`));
     if(event.location) content.append(element('div','event-meta',event.location));
     if(event.description) content.append(element('p','event-description',event.description));
     const bottom = element('div','event-bottom'); bottom.append(element('span','event-author',`Door ${event.author_name}`));
@@ -76,11 +78,11 @@ function render() {
 }
 async function loadEvents() {
   const id = ++requestId;
-  if(demo) { events.sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at)); render(); return; }
+  if(demo) {const start=new Date(month);start.setDate(start.getDate()-(start.getDay()+6)%7);const end=new Date(start);end.setDate(end.getDate()+42);events=window.AgendaRecurrence.expand(demoSeries,start,end);render();return;}
   if(!client || !member) return;
   const start = new Date(month); start.setDate(start.getDate()-(start.getDay()+6)%7);
   const end = new Date(start); end.setDate(end.getDate()+42);
-  const {data,error} = await client.from('events').select('*,attendance(user_id,display_name)').lt('starts_at',end.toISOString()).gt('ends_at',start.toISOString()).order('starts_at');
+  const {data,error} = await client.rpc('calendar_occurrences',{window_start:start.toISOString(),window_end:end.toISOString()});
   if(id !== requestId) return;
   if(error) { notice('De agenda kon niet worden geladen. Probeer Agenda vernieuwen.',true); return; }
   events = data || []; render();
@@ -89,7 +91,7 @@ async function loadEvents() {
 let accessRequest = null, pendingRequests = [], demoRequests = [{user_id:'demo-request',email:'nieuw-lid@voorbeeld.nl',display_name:'Nieuw groepslid',status:'pending'}];
 function showRequestStatus(row) {
  accessRequest=row;$('request-form').hidden=!!row;$('request-mail').hidden=!row||row.status!=='pending'||!!row.notification_sent_at;
- $('request-status').textContent=!row?'Je e-mailadres is bevestigd. Vul je naam in om de beheerder om toegang te vragen.':row.status==='rejected'?'De beheerder heeft je aanvraag afgewezen. Neem contact op met de beheerder als je denkt dat dit niet klopt.':row.status==='approved'?'Je eerdere aanvraag was goedgekeurd, maar je hebt momenteel geen toegang. Neem contact op met de beheerder.':'Je aanvraag wacht op goedkeuring. Tot die tijd heb je geen toegang tot activiteiten.';
+ $('request-status').textContent=!row?'Je e-mailadres is bevestigd. Vul je naam en geboortedatum in om de beheerder om toegang te vragen.':row.status==='rejected'?'De beheerder heeft je aanvraag afgewezen. Neem contact op met de beheerder als je denkt dat dit niet klopt.':row.status==='approved'?'Je eerdere aanvraag was goedgekeurd, maar je hebt momenteel geen toegang. Neem contact op met de beheerder.':'Je aanvraag wacht op goedkeuring. Tot die tijd heb je geen toegang tot activiteiten.';
 }
 async function loadOwnRequest() {
  const {data,error}=await client.from('membership_requests').select('*').eq('user_id',user.id).maybeSingle();
@@ -104,7 +106,8 @@ $('request-form').addEventListener('submit',async e=>{
  e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;
  try{
   const name=$('request-name').value.trim();if(!name)throw new Error('name');
-  const {error}=await client.from('membership_requests').insert({display_name:name});if(error)throw error;
+  const birthDate=$('request-birth-date').value;if(!birthDate || birthDate<'1900-01-01' || birthDate>dateKey(new Date()))throw new Error('birth-date');
+  const {error}=await client.from('membership_requests').insert({display_name:name,birth_date:birthDate});if(error)throw error;
   await loadOwnRequest();notice('Je aanvraag is opgeslagen. Je krijgt pas toegang na goedkeuring.');
   try{await notifyRequest();await loadOwnRequest();}catch{notice('Je aanvraag is opgeslagen en zichtbaar voor de beheerder. De e-mailmelding kon niet worden verstuurd; probeer de melding later opnieuw.',true);}
  }catch{notice('Je aanvraag kon niet worden opgeslagen. Controleer je verbinding en probeer opnieuw.',true);}
@@ -168,10 +171,12 @@ function openEditor(event) {
   editingId = event?.id || null; $('event-form').reset(); $('form-error').textContent = '';
   $('dialog-title').textContent = event ? 'Activiteit bewerken' : 'Nieuwe activiteit'; $('delete-event').hidden = !event;
   let start = selectedDay ? new Date(`${selectedDay}T19:00:00`) : new Date(month.getFullYear(), month.getMonth(), month.getFullYear()===new Date().getFullYear() && month.getMonth()===new Date().getMonth() ? new Date().getDate() : 1, 19);
-  if(event) start = new Date(event.starts_at);
-  const end = event ? new Date(event.ends_at) : new Date(start.getTime()+2*60*60*1000);
+  if(event) start = new Date(event.birthday_user_id?event.starts_at:event.series_starts_at||event.starts_at);
+  const end = event ? new Date(event.birthday_user_id?event.ends_at:event.series_ends_at||event.ends_at) : new Date(start.getTime()+2*60*60*1000);
   $('title').value = event?.title || ''; $('starts').value = localInput(start); $('ends').value = localInput(end);
   $('location').value = event?.location || ''; updateMapsSearch(); $('description').value = event?.description || '';
+  $('recurrence').value=event?.recurrence||'none';$('recurrence').disabled=!!event?.birthday_user_id;$('starts').readOnly=!!event?.birthday_user_id;$('ends').readOnly=!!event?.birthday_user_id;
+  $('series-help').textContent=event?.birthday_user_id?'Deze verjaardag herhaalt ieder jaar als hele dag. De datum is gebaseerd op de geboortedatum.':'Bewerken of verwijderen geldt voor de hele reeks. De herhaling volgt Nederlandse tijd. Wijzig je de datums of herhaling, dan worden aanwezigheidsmeldingen opnieuw ingesteld. Jaarlijks op 29 februari wordt in andere jaren 28 februari.';
   $('event-dialog').showModal(); $('title').focus();
 }
 function editorBusy(busy) { $('save-event').disabled = busy; $('delete-event').disabled = busy; $('close-dialog').disabled = busy; }
@@ -181,9 +186,9 @@ async function toggleAttendance(event,button) {
   try {
     const attending = (event.attendance || []).some(a=>a.user_id === user.id);
     if(demo) {
-      event.attendance = attending ? event.attendance.filter(a=>a.user_id !== user.id) : [...(event.attendance || []),{user_id:user.id,display_name:member.display_name}];
+      const series=demoSeries.find(x=>x.id===event.id);series.attendance=attending?(series.attendance||[]).filter(a=>a.user_id!==user.id||a.occurrence_start!==event.starts_at):[...(series.attendance||[]),{user_id:user.id,display_name:member.display_name,occurrence_start:event.starts_at}];
     } else {
-      const query = attending ? client.from('attendance').delete().eq('event_id',event.id).eq('user_id',user.id) : client.from('attendance').insert({event_id:event.id});
+      const query = attending ? client.from('attendance').delete().eq('event_id',event.id).eq('user_id',user.id).eq('occurrence_start',event.starts_at) : client.from('attendance').insert({event_id:event.id,occurrence_start:event.starts_at});
       const {error} = await query; if(error)throw error;
     }
     await loadEvents();
@@ -193,7 +198,7 @@ async function toggleAttendance(event,button) {
 $('export-all').addEventListener('click',async()=>{
   const button=$('export-all');button.disabled=true;
   try {
-    let all=events;
+    let all=demo?demoSeries:events;
     if(!demo) {
       all=[];
       for(let from=0;;from+=1000) {
@@ -212,13 +217,14 @@ $('event-form').addEventListener('submit',async (e)=>{
   const start = new Date($('starts').value), end = new Date($('ends').value);
   if(!user || !member) { $('form-error').textContent = 'Log opnieuw in om op te slaan.'; return; }
   if(!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end<=start) { $('form-error').textContent = 'De eindtijd moet na de begintijd liggen.'; return; }
-  const payload = {title:$('title').value.trim(),starts_at:start.toISOString(),ends_at:end.toISOString(),location:$('location').value.trim(),description:$('description').value.trim()};
+  const payload = {title:$('title').value.trim(),starts_at:start.toISOString(),ends_at:end.toISOString(),location:$('location').value.trim(),description:$('description').value.trim(),recurrence:$('recurrence').value,time_zone:'Europe/Amsterdam'};
+  if(payload.recurrence!=='none'&&end-start>31*86400000){$('form-error').textContent='Een herhaalactiviteit mag per keer maximaal 31 dagen duren.';return;}
   if(!payload.title) { $('form-error').textContent = 'Vul een titel in.'; return; }
   editorBusy(true); $('form-error').textContent = '';
   try {
     if(demo) {
-      if(editingId) events = events.map(x=>x.id===editingId ? {...x,...payload} : x);
-      else events.push({...payload,id:crypto.randomUUID(),owner_id:user.id,author_name:member.display_name});
+      if(editingId) demoSeries = demoSeries.map(x=>x.id===editingId ? {...x,...payload,attendance:(x.starts_at===payload.starts_at&&x.ends_at===payload.ends_at&&x.recurrence===payload.recurrence)?x.attendance:[]} : x);
+      else demoSeries.push({...payload,id:crypto.randomUUID(),owner_id:user.id,author_name:member.display_name});
     } else {
       const query = editingId ? client.from('events').update(payload).eq('id',editingId) : client.from('events').insert(payload);
       const {data,error} = await query.select('id');
@@ -230,10 +236,10 @@ $('event-form').addEventListener('submit',async (e)=>{
   finally {editorBusy(false);}
 });
 $('delete-event').addEventListener('click',async ()=>{
-  if(!editingId || !confirm('Deze activiteit verwijderen?')) return;
+  if(!editingId || !confirm('Deze activiteit verwijderen? Bij een herhaling wordt de hele reeks verwijderd.')) return;
   editorBusy(true);
   try {
-    if(demo) events = events.filter(x=>x.id !== editingId);
+    if(demo) demoSeries = demoSeries.filter(x=>x.id !== editingId);
     else { const {data,error} = await client.from('events').delete().eq('id',editingId).select('id'); if(error || !data?.length) throw new Error('delete'); }
     $('event-dialog').close(); await loadEvents(); notice(demo ? 'Voorbeeldagenda: de activiteit is tijdelijk verwijderd.' : 'De activiteit is verwijderd.');
   } catch { $('form-error').textContent = 'Verwijderen is niet gelukt. Probeer opnieuw.'; }
@@ -277,7 +283,7 @@ $('ics-file').addEventListener('change',async()=>{
   if(file.size>1048576)throw new Error('Het bestand is te groot (maximaal 1 MB).');
   $('import-status').textContent='Agendabestand lezen…';
   const result=await window.AgendaImport.parse(await file.text());if(generation!==importGeneration)return;
-  let existing=new Set(demo?events.map(e=>e.import_key).filter(Boolean):[]);
+  let existing=new Set(demo?demoSeries.map(e=>e.import_key).filter(Boolean):[]);
   if(!demo&&result.rows.length){const {data,error}=await client.from('events').select('import_key').eq('owner_id',user.id).in('import_key',result.rows.map(e=>e.import_key));if(error)throw new Error('Bestaande imports konden niet worden gecontroleerd.');existing=new Set(data.map(e=>e.import_key));}
   if(generation!==importGeneration)return;
   importRows=result.rows.filter(e=>!existing.has(e.import_key));const duplicates=result.rows.length-importRows.length;
@@ -294,7 +300,7 @@ $('import-form').addEventListener('submit',async e=>{
  importBusy=true;$('confirm-import').disabled=true;$('close-import').disabled=true;$('ics-file').disabled=true;
  try{
   let count=importRows.length;
-  if(demo){importRows.forEach(row=>events.push({...row,id:crypto.randomUUID(),owner_id:user.id,author_name:member.display_name}));}
+  if(demo){importRows.forEach(row=>demoSeries.push({...row,id:crypto.randomUUID(),owner_id:user.id,author_name:member.display_name}));}
   else{const {data,error}=await client.rpc('import_calendar_events',{items:importRows});if(error)throw new Error('import');count=data;}
   const first=new Date(importRows[0].starts_at);month=new Date(first.getFullYear(),first.getMonth(),1);selectedDay=null;
   $('import-dialog').close();notice((demo?'Voorbeeld: ':'')+count+' activiteiten geïmporteerd.');importRows=[];await loadEvents();
@@ -302,20 +308,21 @@ $('import-form').addEventListener('submit',async e=>{
  finally{importBusy=false;$('confirm-import').disabled=!importRows.length;$('close-import').disabled=false;$('ics-file').disabled=false;}
 });
 
+$('request-birth-date').max=dateKey(new Date());
 async function init() {
   render();
   if(demo) {
     user={id:'demo-member'};member={display_name:'Tinus',is_admin:true};
     const sample = (day,hour,duration)=> {const d = new Date(month.getFullYear(),month.getMonth(),day,hour);return {starts_at:d.toISOString(),ends_at:new Date(d.getTime()+duration*3600000).toISOString()};};
-    events = [
+    demoSeries = [
       {id:'sample-1',...sample(9,20,4),title:'Verjaardagsfeest',location:'Bij Noor thuis',description:'Een gezellige avond met de hele groep.',owner_id:'noor',author_name:'Noor'},
       {id:'sample-2',...sample(17,15,3),title:'Samen naar het park',location:'Bij de ingang van het park',description:'Neem iets lekkers mee voor de picknick.',owner_id:user.id,author_name:'Jij'},
       {id:'sample-3',...sample(24,19,4),title:'Spelletjesavond',location:'Bij Sam',description:'Neem je favoriete spel mee.',owner_id:'sam',author_name:'Sam'}
     ];
-    events[0].attendance=[{user_id:'noor',display_name:'Noor'},{user_id:'sam',display_name:'Sam'}];
+    demoSeries[0].attendance=[{user_id:'noor',display_name:'Noor'},{user_id:'sam',display_name:'Sam'}];
     $('login-view').hidden=true;$('agenda-view').hidden=false;$('account-name').textContent='Voorbeeldagenda · Beheerder';$('logout').hidden=false;
     $('footer-note').textContent='Dit is een voorbeeld met fictieve activiteiten. Er wordt niets online opgeslagen.';
-    $('import-ics').hidden=false;$('admin-requests').hidden=false;notice('Voorbeeldagenda: je wijzigingen zijn tijdelijk en verdwijnen bij het herladen.');render();await loadRequests();return;
+    $('import-ics').hidden=false;$('admin-requests').hidden=false;notice('Voorbeeldagenda: je wijzigingen zijn tijdelijk en verdwijnen bij het herladen.');await loadEvents();await loadRequests();return;
   }
   if(!config.supabaseUrl || !config.supabasePublishableKey) { $('setup').hidden=false;$('login-form').querySelector('button').disabled=true;return; }
   try {

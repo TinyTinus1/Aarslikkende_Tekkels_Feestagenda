@@ -67,6 +67,7 @@ Plaats de bestanden **uit deze map** in de hoofdmap van de repository:
 - `app.js`
 - `calendar-export.js`
 - `calendar-import.js`
+- `calendar-recurrence.js`
 - `config.js`
 - `.nojekyll`
 - `README.md`
@@ -151,3 +152,16 @@ Nieuwe SQL-referenties: supabase/membership-approval.sql en supabase/calendar-im
 
 ICS-parser: ICAL.js 2.2.1, https://github.com/kewisch/ical.js
 Edge Function secrets: https://supabase.com/docs/guides/functions/secrets
+
+
+## Geboortedatum, herhaling en activiteitenmeldingen
+
+Nieuwe toegangsaanvragen moeten een geldige geboortedatum bevatten. Na goedkeuring maakt de database één jaarlijkse verjaardag als hele dag. Het geboortejaar staat niet in de gedeelde activiteit; de volledige datum is alleen beschikbaar voor de aanvrager en de beheerder in de aanvraag, en wordt verder privé bewaard. Bestaande leden krijgen geen willekeurige geboortedatum toegewezen.
+
+Activiteiten kunnen dagelijks, wekelijks of jaarlijks herhalen, zonder einddatum. Eén rij bewaart de reeks; alleen de zichtbare periode wordt berekend. Herhaling volgt Europe/Amsterdam en behoudt de lokale tijd bij zomer-/wintertijd. 29 februari wordt in andere jaren 28 februari. Bewerken en verwijderen gelden voor de hele reeks. Aanwezigheid is per afzonderlijke datum; wijzigen van tijd, datum of herhaling wist eerdere aanmeldingen voor de reeks. Een herhaalactiviteit mag per keer maximaal 31 dagen duren. Export ondersteunt RRULE, verjaardagen als hele dag en de Nederlandse tijdzone. ICS-import van externe reeksen wordt nog steeds overgeslagen.
+
+Nieuwe gewone activiteiten krijgen automatisch een mailwachtrij voor andere goedgekeurde leden met een bevestigd e-mailadres. De maker, niet-leden en afgewezen aanvragers krijgen geen mail. Verjaardagen en bewerkingen veroorzaken geen nieuw-activiteitmail. Bulkimports worden binnen één transactie tot één mail per ontvanger gebundeld. Elke minuut controleert Supabase Cron of er mail klaarstaat; de browser mag worden gesloten. Alleen de database bepaalt ontvangers en inhoud. De worker notify-activities heeft JWT-controle aan; de cron gebruikt een openbare anon-projectkey uitsluitend om de worker te wekken. Mailwachtrij en service-RPCs zijn niet toegankelijk voor bezoekers of groepsleden. Per project maximaal 100 mailjobs per dag, vijf automatische pogingen per job bij tijdelijke fouten. Gmail heeft daarnaast eigen verzendlimieten.
+
+SQL-referenties birthdays-recurrence.sql en activity-notifications.sql zijn al toegepast op dit project. Workerbron: supabase/functions/notify-activities/index.ts. De bestaande AGENDA_SMTP_USER en AGENDA_SMTP_PASSWORD worden gebruikt. Geen extra wachtwoorden nodig. Geboortedata horen nooit in de openbare GitHub-repository.
+
+Verificatie op 2 oktober 2026: tests voor verplichte geboortedatum, goedkeuring met verjaardagsaanmaak, privacy, jaarlijkse schrikkeldag, wekelijkse zomer-/wintertijd en aanwezigheid per datum zijn geslaagd en teruggedraaid. Mailwachtrijtests voor bundelen, uitsluiten van de maker en dubbele claims zijn geslaagd. Supabase Cron heeft de gemarkeerde testmelding naar het beheerders-inlogadres in één poging succesvol verstuurd.
