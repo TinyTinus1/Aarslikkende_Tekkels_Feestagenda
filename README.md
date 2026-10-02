@@ -4,6 +4,12 @@ Een eenvoudige Nederlandstalige agenda voor één besloten groep. Geen buildstap
 
 ## Status van deze levering
 
+De naam is Agenda Aarslikkende tekkels. Nieuwe gebruikers bevestigen eerst hun e-mailadres met een inloglink en vragen daarna toegang aan. Totdat een beheerder goedkeurt, kunnen ze geen activiteiten lezen of schrijven. Tinus beoordeelt aanvragen op de website met het bestaande beheerdersaccount; de mailbox zelf verleent geen beheerrechten. Bestaande leden behouden hun toegang.
+
+De aanvraagmelding gaat uitsluitend naar aarslikkendetekkels@gmail.com. De Edge Function notify-membership is gedeployd; verzending vereist nog de hieronder beschreven Gmail-secrets. Goedkeuren gebeurt ingelogd op de website, niet door een e-maillink alleen te openen. Aanvragen blijven ook zichtbaar wanneer mailverzending mislukt.
+
+Bovenaan staat voor beheerders .ICS importeren. Kies maximaal 200 activiteiten in een bestand van maximaal 1 MB, controleer het voorbeeld en bevestig de import. De import is atomair; opnieuw importeren met hetzelfde beheerdersaccount slaat bestaande UID’s over. Losse afspraken en meegestuurde tijdzones worden ondersteund. Terugkerende afspraken, geannuleerde items, ontbrekende tijdzonedefinities en ongeldige velden worden met reden overgeslagen. Zonder eindtijd krijgt een afspraak één uur; een hele dag loopt tot de volgende lokale middernacht. Het geïmporteerde item heeft de beheerder als maker.
+
 De vormgeving heeft oranje knoppen en accenten. Het donkere thema gebruikt een zwarte achtergrond met een iets lichtere kalender. De groepsnaam en maandtekst zijn aangepast; Activiteit toevoegen staat direct onder Op de planning. Onder Waar? staat een gratis Google Maps-zoeklink: typ een adres of locatienaam, open Google Maps en neem het gevonden adres handmatig over. Er is geen API-sleutel nodig en er worden geen adresvoorstellen in het formulier opgehaald.
 
 De versie met beheerrechten, aanwezigheidsregistratie, een donker thema en `.ics`-export is toegevoegd. Tinus heeft beheerrechten in Supabase. Leden kunnen alleen hun eigen activiteiten bewerken en verwijderen; de beheerder kan dat bij alle activiteiten. Elke nieuwe activiteit is zichtbaar voor de hele groep. Je aanwezigheid kun je zelf aan- en uitzetten; anderen zien de namen van aanwezige leden.
@@ -60,6 +66,7 @@ Plaats de bestanden **uit deze map** in de hoofdmap van de repository:
 - `style.css`
 - `app.js`
 - `calendar-export.js`
+- `calendar-import.js`
 - `config.js`
 - `.nojekyll`
 - `README.md`
@@ -128,3 +135,19 @@ Nieuwe commits in de gekozen Pages-branch publiceren wijzigingen. Er zijn geen s
 - SMTP instellen: https://supabase.com/docs/guides/auth/auth-smtp
 
 Google Maps URLs: https://developers.google.com/maps/documentation/urls/get-started
+
+## E-mailmeldingen voor nieuwe aanmeldingen activeren
+
+Supabase → Edge Functions → Secrets:
+
+- AGENDA_SMTP_USER: het Gmail-adres waarmee wordt verstuurd.
+- AGENDA_SMTP_PASSWORD: een geldig appwachtwoord voor dat Gmail-account, uitsluitend hier invoeren.
+
+Het SMTP-wachtwoord van Authentication is niet beschikbaar voor Edge Functions. Deze functie gebruikt smtp.gmail.com, TLS op poort 465, en leest alleen bovenstaande serversecrets. Zet geen wachtwoorden in config.js, GitHub of deze handleiding. Log daarna in als Tinus en klik Test beheerdermail. De bestemming staat vast op aarslikkendetekkels@gmail.com.
+
+De functie accepteert uitsluitend door Supabase geverifieerde gebruikers. Per aanvraag maximaal één geslaagde melding; bij een verzendfout kan na één uur opnieuw worden geprobeerd, maximaal 10 aanvraagmeldingen per uur voor de hele groep. De gebruiker kan Stuur melding opnieuw kiezen. De functie heeft een eigen getUser-authenticatiecontrole; verify_jwt=false schakelt die controle niet uit.
+
+Nieuwe SQL-referenties: supabase/membership-approval.sql en supabase/calendar-import.sql. Beide zijn al op het bestaande project toegepast; niet opnieuw uitvoeren. Bron mailfunctie: supabase/functions/notify-membership/index.ts. Bij browseruploads mogen deze bestanden als referentie in de repositoryroot staan.
+
+ICS-parser: ICAL.js 2.2.1, https://github.com/kewisch/ical.js
+Edge Function secrets: https://supabase.com/docs/guides/functions/secrets

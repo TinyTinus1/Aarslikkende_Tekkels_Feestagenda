@@ -85,17 +85,76 @@ async function loadEvents() {
   if(error) { notice('De agenda kon niet worden geladen. Probeer Agenda vernieuwen.',true); return; }
   events = data || []; render();
 }
+
+let accessRequest = null, pendingRequests = [], demoRequests = [{user_id:'demo-request',email:'nieuw-lid@voorbeeld.nl',display_name:'Nieuw groepslid',status:'pending'}];
+function showRequestStatus(row) {
+ accessRequest=row;$('request-form').hidden=!!row;$('request-mail').hidden=!row||row.status!=='pending'||!!row.notification_sent_at;
+ $('request-status').textContent=!row?'Je e-mailadres is bevestigd. Vul je naam in om de beheerder om toegang te vragen.':row.status==='rejected'?'De beheerder heeft je aanvraag afgewezen. Neem contact op met de beheerder als je denkt dat dit niet klopt.':row.status==='approved'?'Je eerdere aanvraag was goedgekeurd, maar je hebt momenteel geen toegang. Neem contact op met de beheerder.':'Je aanvraag wacht op goedkeuring. Tot die tijd heb je geen toegang tot activiteiten.';
+}
+async function loadOwnRequest() {
+ const {data,error}=await client.from('membership_requests').select('*').eq('user_id',user.id).maybeSingle();
+ if(error)throw error;showRequestStatus(data);
+}
+async function notifyRequest(action='request') {
+ const {data,error}=await client.functions.invoke('notify-membership',{body:{action}});
+ if(error||!data?.sent)throw new Error('mail');
+ return data;
+}
+$('request-form').addEventListener('submit',async e=>{
+ e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;
+ try{
+  const name=$('request-name').value.trim();if(!name)throw new Error('name');
+  const {error}=await client.from('membership_requests').insert({display_name:name});if(error)throw error;
+  await loadOwnRequest();notice('Je aanvraag is opgeslagen. Je krijgt pas toegang na goedkeuring.');
+  try{await notifyRequest();await loadOwnRequest();}catch{notice('Je aanvraag is opgeslagen en zichtbaar voor de beheerder. De e-mailmelding kon niet worden verstuurd; probeer de melding later opnieuw.',true);}
+ }catch{notice('Je aanvraag kon niet worden opgeslagen. Controleer je verbinding en probeer opnieuw.',true);}
+ finally{button.disabled=false;}
+});
+$('request-refresh').addEventListener('click',async()=>{const {data}=await client.auth.getSession();await applySession(data.session);});
+$('request-mail').addEventListener('click',async()=>{
+ const button=$('request-mail');button.disabled=true;
+ try{await notifyRequest();await loadOwnRequest();notice('De beheerder heeft een e-mailmelding gekregen.');}catch{notice('De e-mailmelding kon niet worden verstuurd. Je aanvraag blijft staan. Probeer het over een uur opnieuw.',true);}finally{button.disabled=false;}
+});
+async function loadRequests() {
+ if(!member?.is_admin)return;
+ let rows=demoRequests;
+ if(!demo){const {data,error}=await client.from('membership_requests').select('user_id,email,display_name,created_at').eq('status','pending').order('created_at');if(error){notice('Aanvragen konden niet worden geladen.',true);return;}rows=data||[];}
+ pendingRequests=rows;const list=$('request-list');list.replaceChildren();
+ if(!rows.length)list.append(element('p','','Geen openstaande aanvragen.'));
+ rows.forEach(row=>{
+  const card=element('div','request-card');const info=element('div');info.append(element('strong','',row.display_name),element('p','',row.email));card.append(info);
+  const actions=element('div','request-actions');
+  for(const [status,label] of [['approved','Goedkeuren'],['rejected','Afwijzen']]){
+   const b=element('button',status==='approved'?'primary':'quiet',label);b.addEventListener('click',async()=>{
+    if(!confirm((status==='approved'?'Toegang geven aan ':'Aanvraag afwijzen van ')+row.display_name+' ('+row.email+')?'))return;
+    actions.querySelectorAll('button').forEach(x=>x.disabled=true);
+    try{
+     if(demo)demoRequests=demoRequests.filter(x=>x.user_id!==row.user_id);
+     else{const {data,error}=await client.from('membership_requests').update({status}).eq('user_id',row.user_id).eq('status','pending').select('user_id');if(error||!data?.length)throw new Error('review');}
+     notice(demo?'Voorbeeld: aanvraag beoordeeld. Er zijn geen echte accounts gewijzigd.':status==='approved'?'Gebruiker goedgekeurd. De gebruiker kan nu de agenda openen.':'Aanvraag afgewezen. De gebruiker krijgt geen toegang.');await loadRequests();
+    }catch{notice('Beoordelen is niet gelukt. Vernieuw de aanvragen en probeer opnieuw.',true);actions.querySelectorAll('button').forEach(x=>x.disabled=false);}
+   });actions.append(b);
+  }card.append(actions);list.append(card);
+ });
+}
+$('refresh-requests').addEventListener('click',loadRequests);
+$('test-admin-mail').addEventListener('click',async()=>{
+ if(demo){notice('Een testmail versturen kan alleen met je echte beheerdersaccount.');return;}
+ const button=$('test-admin-mail');button.disabled=true;
+ try{await notifyRequest('test');notice('Testmail verstuurd naar de beheerdersmailbox.');}catch{notice('Testmail kon niet worden verstuurd. Controleer de mailinstellingen voor beheerdersmeldingen.',true);}finally{button.disabled=false;}
+});
+
 async function applySession(session) {
   const id = ++requestId; user = session?.user || null; member = null; events = [];
-  $('event-dialog').close(); $('agenda-view').hidden = true; $('login-view').hidden = false;
+  $('event-dialog').close();$('import-dialog').close();$('import-ics').hidden=true;$('admin-requests').hidden=true;$('request-view').hidden=true; $('agenda-view').hidden = true; $('login-view').hidden = false;
   $('logout').hidden = !user; $('account-name').textContent = '';
   if(!user) { render(); return; }
   const {data,error} = await client.from('members').select('display_name,is_admin').maybeSingle();
   if(id !== requestId) return;
   if(error) { notice('Je groepslidmaatschap kon niet worden gecontroleerd. Probeer opnieuw in te loggen.',true); return; }
-  if(!data) { notice('Je bent ingelogd, maar nog geen lid van deze groep. Vraag de beheerder om jouw e-mailadres toe te voegen.',true); return; }
+  if(!data) { $('login-view').hidden=true;$('request-view').hidden=false;$('account-name').textContent='Toegang aanvragen';notice('');try{await loadOwnRequest();}catch{notice('Je aanvraagstatus kon niet worden geladen. Probeer opnieuw.',true);}return; }
   member = data; $('account-name').textContent = member.display_name + (member.is_admin ? ' · Beheerder' : '');
-  $('login-view').hidden = true; $('agenda-view').hidden = false; notice(''); await loadEvents();
+  $('login-view').hidden = true; $('agenda-view').hidden = false;$('import-ics').hidden=!member.is_admin;$('admin-requests').hidden=!member.is_admin;notice('');await loadEvents();await loadRequests();
 }
 function updateMapsSearch() {
   const query = $('location').value.trim(), link = $('maps-search');
@@ -203,6 +262,46 @@ $('login-form').addEventListener('submit',async(e)=>{
   } catch {notice('De inloglink kon niet worden verstuurd. Controleer het e-mailadres of probeer het later opnieuw.',true);}
   finally {button.disabled=false;}
 });
+
+let importRows=[],importBusy=false,importGeneration=0;
+$('import-ics').addEventListener('click',()=>{
+ if(!member?.is_admin)return;
+ importRows=[];importGeneration++;$('import-form').reset();$('import-preview').replaceChildren();$('import-status').textContent='';$('confirm-import').disabled=true;$('import-dialog').showModal();
+});
+$('close-import').addEventListener('click',()=>{if(!importBusy){importGeneration++;$('import-dialog').close();}});
+$('import-dialog').addEventListener('cancel',e=>{if(importBusy)e.preventDefault();else importGeneration++;});
+$('ics-file').addEventListener('change',async()=>{
+ const generation=++importGeneration;importRows=[];$('confirm-import').disabled=true;$('import-preview').replaceChildren();
+ const file=$('ics-file').files[0];if(!file)return;
+ try{
+  if(file.size>1048576)throw new Error('Het bestand is te groot (maximaal 1 MB).');
+  $('import-status').textContent='Agendabestand lezen…';
+  const result=await window.AgendaImport.parse(await file.text());if(generation!==importGeneration)return;
+  let existing=new Set(demo?events.map(e=>e.import_key).filter(Boolean):[]);
+  if(!demo&&result.rows.length){const {data,error}=await client.from('events').select('import_key').eq('owner_id',user.id).in('import_key',result.rows.map(e=>e.import_key));if(error)throw new Error('Bestaande imports konden niet worden gecontroleerd.');existing=new Set(data.map(e=>e.import_key));}
+  if(generation!==importGeneration)return;
+  importRows=result.rows.filter(e=>!existing.has(e.import_key));const duplicates=result.rows.length-importRows.length;
+  $('import-status').textContent=importRows.length+' activiteiten klaar om toe te voegen. '+duplicates+' eerder geïmporteerd; '+result.skipped.length+' overgeslagen.';
+  const preview=$('import-preview');
+  importRows.forEach(row=>{const item=element('div','import-item');item.append(element('strong','',row.title),element('p','',format(row.starts_at,{dateStyle:'medium',timeStyle:'short'})+' – '+format(row.ends_at,{dateStyle:'medium',timeStyle:'short'})));preview.append(item);});
+  if(result.skipped.length){const details=element('details');details.append(element('summary','','Waarom zijn activiteiten overgeslagen?'));result.skipped.forEach(reason=>details.append(element('p','',reason)));preview.append(details);}
+  if(!result.total)$('import-status').textContent='Dit bestand bevat geen activiteiten.';
+  $('confirm-import').disabled=!importRows.length;
+ }catch(error){if(generation===importGeneration)$('import-status').textContent=error.message;}
+});
+$('import-form').addEventListener('submit',async e=>{
+ e.preventDefault();if(importBusy||!member?.is_admin||!importRows.length)return;
+ importBusy=true;$('confirm-import').disabled=true;$('close-import').disabled=true;$('ics-file').disabled=true;
+ try{
+  let count=importRows.length;
+  if(demo){importRows.forEach(row=>events.push({...row,id:crypto.randomUUID(),owner_id:user.id,author_name:member.display_name}));}
+  else{const {data,error}=await client.rpc('import_calendar_events',{items:importRows});if(error)throw new Error('import');count=data;}
+  const first=new Date(importRows[0].starts_at);month=new Date(first.getFullYear(),first.getMonth(),1);selectedDay=null;
+  $('import-dialog').close();notice((demo?'Voorbeeld: ':'')+count+' activiteiten geïmporteerd.');importRows=[];await loadEvents();
+ }catch{$('import-status').textContent='Importeren is niet gelukt. Er zijn geen gedeeltelijke wijzigingen opgeslagen. Controleer je beheerdersrechten en probeer opnieuw.';}
+ finally{importBusy=false;$('confirm-import').disabled=!importRows.length;$('close-import').disabled=false;$('ics-file').disabled=false;}
+});
+
 async function init() {
   render();
   if(demo) {
@@ -216,7 +315,7 @@ async function init() {
     events[0].attendance=[{user_id:'noor',display_name:'Noor'},{user_id:'sam',display_name:'Sam'}];
     $('login-view').hidden=true;$('agenda-view').hidden=false;$('account-name').textContent='Voorbeeldagenda · Beheerder';$('logout').hidden=false;
     $('footer-note').textContent='Dit is een voorbeeld met fictieve activiteiten. Er wordt niets online opgeslagen.';
-    notice('Voorbeeldagenda: je wijzigingen zijn tijdelijk en verdwijnen bij het herladen.');render();return;
+    $('import-ics').hidden=false;$('admin-requests').hidden=false;notice('Voorbeeldagenda: je wijzigingen zijn tijdelijk en verdwijnen bij het herladen.');render();await loadRequests();return;
   }
   if(!config.supabaseUrl || !config.supabasePublishableKey) { $('setup').hidden=false;$('login-form').querySelector('button').disabled=true;return; }
   try {
