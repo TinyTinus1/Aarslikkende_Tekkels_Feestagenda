@@ -4,7 +4,7 @@ Een eenvoudige Nederlandstalige agenda voor één besloten groep. Geen buildstap
 
 ## Status van deze levering
 
-De naam is Agenda Aarslikkende tekkels. Nieuwe gebruikers bevestigen eerst hun e-mailadres met een inloglink en vragen daarna toegang aan. Totdat een beheerder goedkeurt, kunnen ze geen activiteiten lezen of schrijven. Tinus beoordeelt aanvragen op de website met het bestaande beheerdersaccount; de mailbox zelf verleent geen beheerrechten. Bestaande leden behouden hun toegang.
+De naam is Agenda Aarslikkende tekkels. Nieuwe gebruikers bevestigen eerst hun e-mailadres met een code uit de e-mail en vragen daarna toegang aan. Al bevestigde accounts blijven inloggen met een inloglink. Totdat een beheerder goedkeurt, kunnen ze geen activiteiten lezen of schrijven. Tinus beoordeelt aanvragen op de website met het bestaande beheerdersaccount; de mailbox zelf verleent geen beheerrechten. Bestaande leden behouden hun toegang.
 
 De aanvraagmelding gaat uitsluitend naar aarslikkendetekkels@gmail.com. De Edge Function notify-membership is gedeployd, de Gmail-secrets zijn ingesteld en de testmail is op 2 oktober 2026 succesvol via het ingelogde beheerdersaccount verstuurd. Goedkeuren gebeurt ingelogd op de website, niet door een e-maillink alleen te openen. Aanvragen blijven ook zichtbaar wanneer mailverzending mislukt.
 
@@ -173,6 +173,6 @@ Vanaf 2 oktober 2026 zet goedkeuren van een nieuwe toegangsaanvraag automatisch 
 
 
 ### Eerste aanmelding met code
-Nieuwe, nog niet bevestigde Auth-accounts krijgen in de Supabase-mail **Confirm sign up** alleen `{{ .Token }}` en een gewone link naar de agenda, zonder bevestigingstoken in de link. Het sjabloon staat in `supabase/signup-email.html`. De mail **Magic link or OTP** blijft een inloglink bevatten voor al bevestigde accounts. Na verificatie via `verifyOtp({ email, token, type: "email" })` volgt het bestaande formulier voor naam/geboortedatum en de beheerdersgoedkeuring. Bestaande accounts hoeven hun adres niet opnieuw te bevestigen.
+Nieuwe, nog niet bevestigde Auth-accounts krijgen in de Supabase-mail **Confirm sign up** alleen `{{ .Token }}` en een gewone link naar de agenda, zonder bevestigingstoken in de link. Het sjabloon staat in `supabase/signup-email.html` (bij een platte browserupload: `signup-email.html` in de repositoryroot). De mail **Magic link or OTP** blijft een inloglink bevatten voor al bevestigde accounts. Na verificatie via `verifyOtp({ email, token, type: "email" })` volgt het bestaande formulier voor naam/geboortedatum en de beheerdersgoedkeuring. Bestaande accounts hoeven hun adres niet opnieuw te bevestigen.
 
 Bij terugkeer uit Google Maps negeert de app herhaalde `SIGNED_IN`-meldingen voor dezelfde ingelogde gebruiker, zodat het open formulier en niet opgeslagen invoer behouden blijven. Een echte uitlog of accountwisseling sluit het formulier wel.
