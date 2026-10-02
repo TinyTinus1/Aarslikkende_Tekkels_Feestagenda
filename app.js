@@ -91,7 +91,7 @@ async function loadEvents() {
 let accessRequest = null, pendingRequests = [], demoRequests = [{user_id:'demo-request',email:'nieuw-lid@voorbeeld.nl',display_name:'Nieuw groepslid',status:'pending'}];
 function showRequestStatus(row) {
  accessRequest=row;$('request-form').hidden=!!row;$('request-mail').hidden=!row||row.status!=='pending'||!!row.notification_sent_at;
- $('request-status').textContent=!row?'Je e-mailadres is bevestigd. Vul je naam en geboortedatum in om de beheerder om toegang te vragen.':row.status==='rejected'?'De beheerder heeft je aanvraag afgewezen. Neem contact op met de beheerder als je denkt dat dit niet klopt.':row.status==='approved'?'Je eerdere aanvraag was goedgekeurd, maar je hebt momenteel geen toegang. Neem contact op met de beheerder.':'Je aanvraag wacht op goedkeuring. Tot die tijd heb je geen toegang tot activiteiten.';
+ $('request-status').textContent=!row?'Je e-mailadres is bevestigd. Vul je naam en geboortedatum in om de beheerder om toegang te vragen.':row.status==='rejected'?'De beheerder heeft je aanvraag afgewezen. Neem contact op met de beheerder als je denkt dat dit niet klopt.':row.status==='approved'?'Je eerdere aanvraag was goedgekeurd, maar je hebt momenteel geen toegang. Neem contact op met de beheerder.':'Je aanvraag wacht op goedkeuring. Je krijgt een bevestigingsmail zodra je bent toegelaten. Tot die tijd heb je geen toegang tot activiteiten.';
 }
 async function loadOwnRequest() {
  const {data,error}=await client.from('membership_requests').select('*').eq('user_id',user.id).maybeSingle();
@@ -134,7 +134,7 @@ async function loadRequests() {
     try{
      if(demo)demoRequests=demoRequests.filter(x=>x.user_id!==row.user_id);
      else{const {data,error}=await client.from('membership_requests').update({status}).eq('user_id',row.user_id).eq('status','pending').select('user_id');if(error||!data?.length)throw new Error('review');}
-     notice(demo?'Voorbeeld: aanvraag beoordeeld. Er zijn geen echte accounts gewijzigd.':status==='approved'?'Gebruiker goedgekeurd. De gebruiker kan nu de agenda openen.':'Aanvraag afgewezen. De gebruiker krijgt geen toegang.');await loadRequests();
+     notice(demo?'Voorbeeld: aanvraag beoordeeld. Er zijn geen echte accounts gewijzigd.':status==='approved'?'Gebruiker goedgekeurd. De gebruiker kan nu de agenda openen en krijgt automatisch een bevestigingsmail.':'Aanvraag afgewezen. De gebruiker krijgt geen toegang.');await loadRequests();
     }catch{notice('Beoordelen is niet gelukt. Vernieuw de aanvragen en probeer opnieuw.',true);actions.querySelectorAll('button').forEach(x=>x.disabled=false);}
    });actions.append(b);
   }card.append(actions);list.append(card);

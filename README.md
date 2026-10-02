@@ -165,3 +165,8 @@ Nieuwe gewone activiteiten krijgen automatisch een mailwachtrij voor andere goed
 SQL-referenties birthdays-recurrence.sql en activity-notifications.sql zijn al toegepast op dit project. Workerbron: supabase/functions/notify-activities/index.ts. De bestaande AGENDA_SMTP_USER en AGENDA_SMTP_PASSWORD worden gebruikt. Geen extra wachtwoorden nodig. Geboortedata horen nooit in de openbare GitHub-repository.
 
 Verificatie op 2 oktober 2026: tests voor verplichte geboortedatum, goedkeuring met verjaardagsaanmaak, privacy, jaarlijkse schrikkeldag, wekelijkse zomer-/wintertijd en aanwezigheid per datum zijn geslaagd en teruggedraaid. Mailwachtrijtests voor bundelen, uitsluiten van de maker en dubbele claims zijn geslaagd. Supabase Cron heeft de gemarkeerde testmelding naar het beheerders-inlogadres in één poging succesvol verstuurd.
+
+
+## Bevestigingsmail na goedkeuring
+
+Vanaf 2 oktober 2026 zet goedkeuren van een nieuwe toegangsaanvraag automatisch één welkomstmail klaar voor het bevestigde e-mailadres van die gebruiker. De mail bevat de tekst Je bent toegelaten tot de groep en een oranje Open de agenda-knop. Die link verleent geen toegang zonder de bestaande inlogflow. Afwijzen verstuurt geen welkomstmail. De bestaande serverwachtrij, retry-logica, JWT-beveiligde worker en Cron-taak worden gebruikt. Als toegang vóór verzending is ingetrokken, wordt de mail overgeslagen. Er is geen backfill naar eerder goedgekeurde leden. De migratie approval-notifications.sql is al toegepast; notify-activities is bijgewerkt naar versie 2. Database-tests zijn teruggedraaid; mailinhoud, HTML-escaping, activiteitenmail en afleveringregistratie zijn met een gemockte SMTP-transport getest.
