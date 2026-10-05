@@ -212,6 +212,17 @@ async function toggleAttendance(event,button) {
       const query = attending ? client.from('attendance').delete().eq('event_id',event.id).eq('user_id',user.id).eq('occurrence_start',event.starts_at) : client.from('attendance').insert({event_id:event.id,occurrence_start:event.starts_at});
       const {error} = await query; if(error)throw error;
     }
+    if(!attending) {
+      try {
+        // Attendance applies to one date; do not import an entire recurring series.
+        const single={...event,recurrence:'none',series_starts_at:null,series_ends_at:null};
+        if(event.recurrence && event.recurrence!=='none')single.id=event.id+'-'+new Date(event.starts_at).toISOString().replace(/[^0-9]/g,'');
+        window.AgendaExport.download([single],`activiteit-${single.id}.ics`);
+        notice('Je aanwezigheid is opgeslagen. Open het .ics-bestand en bevestig het toevoegen in je persoonlijke agenda. Afmelden verwijdert de afspraak niet uit je persoonlijke agenda.');
+      } catch {
+        notice('Je aanwezigheid is opgeslagen. Het agendabestand kon niet worden aangeboden. Gebruik de knop Voeg toe aan persoonlijke agenda.',true);
+      }
+    } else notice('Je bent afgemeld. Verwijder de afspraak eventueel zelf uit je persoonlijke agenda.');
     await loadEvents();
   } catch {notice('Je aanwezigheid kon niet worden opgeslagen. Probeer opnieuw.',true);}
   finally {button.disabled=false;}
