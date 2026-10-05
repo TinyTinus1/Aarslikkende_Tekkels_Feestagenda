@@ -40,6 +40,45 @@ const localInput = (d) => `${dateKey(d)}T${String(d.getHours()).padStart(2,'0')}
 const format = (date, options) => new Intl.DateTimeFormat('nl-NL', options).format(new Date(date));
 function element(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; }
 function notice(message, error = false) { $('notice').textContent = message; $('notice').classList.toggle('error', error); $('notice').hidden = !message; }
+
+let pendingCalendarEvent=null;
+const calendarProviders=['samsung','apple','google','ics'];
+function calendarPreference() {try {const value=localStorage.getItem('agenda-calendar-'+user?.id);return calendarProviders.includes(value)?value:null;}catch{return null;}}
+function googleCalendarUrl(event) {
+ const lines=window.AgendaExport.build([event]).replace(/\r\n /g,'').split('\r\n');
+ const start=lines.find(x=>x.startsWith('DTSTART:')||x.startsWith('DTSTART;'));
+ const end=lines.find(x=>x.startsWith('DTEND:')||x.startsWith('DTEND;'));
+ const url=new URL('https://calendar.google.com/calendar/render');
+ url.searchParams.set('action','TEMPLATE');url.searchParams.set('text',event.title||'Activiteit');
+ url.searchParams.set('dates',start.slice(start.indexOf(':')+1)+'/'+end.slice(end.indexOf(':')+1));
+ url.searchParams.set('ctz','Europe/Amsterdam');url.searchParams.set('location',event.location||'');url.searchParams.set('details',event.description||'');
+ const repeat=lines.find(x=>x.startsWith('RRULE:'));if(repeat)url.searchParams.set('recur',repeat);
+ return url.href;
+}
+function chooseCalendar(event) {
+ pendingCalendarEvent=event;$('calendar-provider').value=calendarPreference()||'';$('calendar-remember').checked=true;
+ $('calendar-choice-form').reset();$('calendar-provider').value=calendarPreference()||'';$('calendar-remember').checked=true;
+ $('calendar-choice-dialog').showModal();$('calendar-provider').focus();
+}
+function offerCalendar(event,popup=null) {
+ const provider=calendarPreference();
+ if(!provider){if(popup)popup.close();chooseCalendar(event);return;}
+ if(provider==='google') {
+  if(popup){popup.location.replace(googleCalendarUrl(event));notice('Je aanwezigheid is opgeslagen. Bevestig de afspraak in Google Agenda. Afmelden verwijdert de afspraak daar niet.');}
+  else {chooseCalendar(event);notice('Je aanwezigheid is opgeslagen. Kies Doorgaan om Google Agenda te openen.');}
+ }else {window.AgendaExport.download([event],`activiteit-${event.id}.ics`);notice('Je aanwezigheid is opgeslagen. Open het .ics-bestand in je agenda-app en bevestig het toevoegen. Afmelden verwijdert de afspraak daar niet.');}
+}
+$('close-calendar-choice').addEventListener('click',()=>{$('calendar-choice-dialog').close();pendingCalendarEvent=null;});
+$('calendar-choice-dialog').addEventListener('cancel',()=>{pendingCalendarEvent=null;});
+$('calendar-choice-form').addEventListener('submit',e=>{
+ e.preventDefault();const event=pendingCalendarEvent,provider=$('calendar-provider').value;if(!event||!calendarProviders.includes(provider))return;
+ let remembered=false;try{if($('calendar-remember').checked){localStorage.setItem('agenda-calendar-'+user?.id,provider);remembered=true;}else localStorage.removeItem('agenda-calendar-'+user?.id);}catch{}
+ if(provider==='google') {const opened=window.open(googleCalendarUrl(event),'_blank','noopener,noreferrer');}
+ else window.AgendaExport.download([event],`activiteit-${event.id}.ics`);
+ $('calendar-choice-dialog').close();pendingCalendarEvent=null;
+ notice((provider==='google'?'Bevestig de afspraak in Google Agenda.':'Open het .ics-bestand in je agenda-app en bevestig het toevoegen.')+(remembered?' Je agendakeuze is onthouden in deze browser.':''));
+});
+
 function overlapsDay(event, day) { const end = new Date(day); end.setDate(end.getDate()+1); return new Date(event.starts_at) < end && new Date(event.ends_at) > day; }
 function render() {
   $('month-title').textContent = format(month, {month:'long',year:'numeric'});
@@ -92,7 +131,7 @@ function render() {
     attend.setAttribute('aria-pressed',String(attending));
     attend.addEventListener('click',()=>toggleAttendance(event,attend));
     const exportButton = element('button','quiet calendar-export','Voeg toe aan persoonlijke agenda');
-    exportButton.addEventListener('click',()=>window.AgendaExport.download([event],`activiteit-${event.id}.ics`));
+    exportButton.addEventListener('click',()=>chooseCalendar(event));
     actions.append(attend,exportButton);attendance.append(actions);content.append(attendance);
     card.append(badge,content);list.append(card);
   });
@@ -170,7 +209,7 @@ $('test-admin-mail').addEventListener('click',async()=>{
 
 async function applySession(session) {
   const id = ++requestId; user = session?.user || null; member = null; events = [];
-  $('event-dialog').close();$('import-dialog').close();$('import-ics').hidden=true;$('admin-requests').hidden=true;$('request-view').hidden=true; $('agenda-view').hidden = true; $('login-view').hidden = false;
+  $('event-dialog').close();$('import-dialog').close();$('calendar-choice-dialog').close();pendingCalendarEvent=null;$('import-ics').hidden=true;$('admin-requests').hidden=true;$('request-view').hidden=true; $('agenda-view').hidden = true; $('login-view').hidden = false;
   $('logout').hidden = !user; $('account-name').textContent = '';
   if(!user) { resetCodeStep();render();if(authReturnError)notice(authReturnError,true);return; }
   const {data,error} = await client.from('members').select('display_name,is_admin').maybeSingle();
@@ -204,8 +243,10 @@ function editorBusy(busy) { $('save-event').disabled = busy; $('delete-event').d
 async function toggleAttendance(event,button) {
   if(!user || !member) return;
   button.disabled=true;
+  const attending=(event.attendance||[]).some(a=>a.user_id===user.id);
+  let calendarPopup=null;
+  if(!attending && calendarPreference()==='google') {calendarPopup=window.open('about:blank','_blank');if(calendarPopup)calendarPopup.opener=null;}
   try {
-    const attending = (event.attendance || []).some(a=>a.user_id === user.id);
     if(demo) {
       const series=demoSeries.find(x=>x.id===event.id);series.attendance=attending?(series.attendance||[]).filter(a=>a.user_id!==user.id||a.occurrence_start!==event.starts_at):[...(series.attendance||[]),{user_id:user.id,display_name:member.display_name,occurrence_start:event.starts_at}];
     } else {
@@ -217,14 +258,13 @@ async function toggleAttendance(event,button) {
         // Attendance applies to one date; do not import an entire recurring series.
         const single={...event,recurrence:'none',series_starts_at:null,series_ends_at:null};
         if(event.recurrence && event.recurrence!=='none')single.id=event.id+'-'+new Date(event.starts_at).toISOString().replace(/[^0-9]/g,'');
-        window.AgendaExport.download([single],`activiteit-${single.id}.ics`);
-        notice('Je aanwezigheid is opgeslagen. Open het .ics-bestand en bevestig het toevoegen in je persoonlijke agenda. Afmelden verwijdert de afspraak niet uit je persoonlijke agenda.');
+        offerCalendar(single,calendarPopup);
       } catch {
         notice('Je aanwezigheid is opgeslagen. Het agendabestand kon niet worden aangeboden. Gebruik de knop Voeg toe aan persoonlijke agenda.',true);
       }
     } else notice('Je bent afgemeld. Verwijder de afspraak eventueel zelf uit je persoonlijke agenda.');
     await loadEvents();
-  } catch {notice('Je aanwezigheid kon niet worden opgeslagen. Probeer opnieuw.',true);}
+  } catch {if(calendarPopup)calendarPopup.close();notice('Je aanwezigheid kon niet worden opgeslagen. Probeer opnieuw.',true);}
   finally {button.disabled=false;}
 }
 $('export-all').addEventListener('click',async()=>{

@@ -12,3 +12,5 @@
 select {width:100%;font:inherit;padding:12px;border:1px solid #cfd8e6;border-radius:8px;background:white;color:#18283b;margin-bottom:8px;}
 
 html[data-theme=dark] select{background:#20201e;color:#eee;border-color:#47443f;}
+
+.calendar-remember-label{display:flex;align-items:center;gap:.7rem;margin:1rem 0}.calendar-remember-label input{width:auto;margin:0;accent-color:var(--accent,#ea580c)}
